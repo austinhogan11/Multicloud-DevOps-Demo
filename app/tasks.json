@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "title": "Build Task API Python + FastAPI",
+    "completed": true
+  },
+  {
+    "id": 2,
+    "title": "Build frontend React + Tailwind CSS",
+    "completed": true
+  },
+  {
+    "id": 3,
+    "title": "Wire Frontend to Task API",
+    "completed": true
+  },
+  {
+    "id": 4,
+    "title": "Dockerize",
+    "completed": false
+  },
+  {
+    "id": 5,
+    "title": "Build AWS Infra with Terraform",
+    "completed": false
+  },
+  {
+    "id": 6,
+    "title": "Deploy to AWS & Automate with Github Actions CI/CD",
+    "completed": false
+  },
+  {
+    "id": 7,
+    "title": "Monitor with Splunk",
+    "completed": false
+  },
+  {
+    "id": 8,
+    "title": "Analytics with Adobe Analytics",
+    "completed": false
+  },
+  {
+    "id": 9,
+    "title": "Add E-Commerce",
+    "completed": false
+  }
+]
