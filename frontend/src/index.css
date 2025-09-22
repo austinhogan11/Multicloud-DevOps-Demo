@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* Custom theme colors used in the UI */
+@theme {
+  --color-accent: #ea6a1c;    /* orange accent */
+  --color-accent-2: #f6a436;  /* lighter orange for hover */
+  --color-charcoal: #0f1115;  /* dark page background */
+}
+
+/* Global base styles and dark mode colors */
+@layer base {
+  html {
+    /* Light uses gray, dark uses charcoal */
+    @apply bg-gray-50 text-gray-900 dark:bg-charcoal dark:text-gray-100;
+  }
+  body, #root {
+    /* Fill the viewport so content can center nicely */
+    @apply min-h-screen;
+  }
+}
