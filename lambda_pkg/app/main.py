@@ -10,14 +10,20 @@ import threading
 # Create a FastAPI app instance
 app = FastAPI()
 
-# Allow the Vite dev server to call this API (CORS)
+# Allow the frontend to call this API (CORS)
+# In production, set ALLOW_ORIGINS to a comma-separated list (e.g.,
+# "https://dxxxx.cloudfront.net,https://mydomain.com").
+_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+_allow_env = os.getenv("ALLOW_ORIGINS", "")
+if _allow_env:
+    _origins += [o.strip() for o in _allow_env.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

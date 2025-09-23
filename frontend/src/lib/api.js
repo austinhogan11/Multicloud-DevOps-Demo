@@ -1,42 +1,45 @@
 // Very small API client for the FastAPI tasks endpoints.
-// In dev, calls go to `/api/*` and are proxied by Vite to the backend.
+// Dev: Vite proxy forwards `/api/*` to the backend.
+// Prod (S3/CloudFront): set `VITE_API_BASE` to your API Gateway/Lambda URL.
 
-const BASE = '/api'
+const RAW_BASE = import.meta.env.VITE_API_BASE || '/api'
+const BASE = RAW_BASE.replace(/\/$/, '') // trim trailing slash
+
+async function request(path, init) {
+  const url = `${BASE}${path}`
+  const res = await fetch(url, init)
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status} for ${url}${text ? `: ${text.slice(0,120)}` : ''}`)
+  }
+  return res.json()
+}
 
 // GET /tasks/
 export async function fetchTasks() {
-  const res = await fetch(`${BASE}/tasks/`)
-  if (!res.ok) throw new Error(`Failed to fetch tasks: ${res.status}`)
-  return res.json()
+  return request(`/tasks/`)
 }
 
 // POST /tasks/
 // The backend expects an object with id, title, completed
 export async function createTask(task) {
-  const res = await fetch(`${BASE}/tasks/`, {
+  return request(`/tasks/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(task),
   })
-  if (!res.ok) throw new Error(`Failed to create task: ${res.status}`)
-  return res.json()
 }
 
 // PUT /tasks/{id}
 export async function updateTask(task) {
-  const res = await fetch(`${BASE}/tasks/${task.id}`, {
+  return request(`/tasks/${task.id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(task),
   })
-  if (!res.ok) throw new Error(`Failed to update task: ${res.status}`)
-  return res.json()
 }
 
 // DELETE /tasks/{id}
 export async function deleteTask(id) {
-  const res = await fetch(`${BASE}/tasks/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error(`Failed to delete task: ${res.status}`)
-  return res.json()
+  return request(`/tasks/${id}`, { method: 'DELETE' })
 }
-
