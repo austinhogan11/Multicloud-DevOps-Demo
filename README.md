@@ -7,6 +7,10 @@ Simple Todo app to show a full stack:
 - Persistence: JSON file (survives restarts)
 - Docker: Frontend (Nginx) + Backend (Uvicorn) with Compose
 
+## Preview
+
+<img src="docs/todo-app.png" alt="Todo App UI" />
+
 ## What We Built
 
 - Todo UI
@@ -58,4 +62,3 @@ docker compose up --build
 - `DELETE /tasks/{id}` – remove task
 
 Task model: `id: int`, `title: str`, `completed: bool = False`
-
