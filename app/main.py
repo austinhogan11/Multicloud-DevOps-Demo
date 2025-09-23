@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from pathlib import Path
+import os
 import json
 import threading
 
@@ -40,8 +41,9 @@ class Task(BaseModel):
 # In-memory storage for tasks
 tasks = {}
 
-# Simple local persistence to a JSON file next to this module
-TASKS_FILE = Path(__file__).with_name("tasks.json")
+# Simple local persistence to a JSON file
+# By default, write next to this module. Can be overridden via env var.
+TASKS_FILE = Path(os.getenv("TASKS_FILE", str(Path(__file__).with_name("tasks.json"))))
 _lock = threading.Lock()
 
 def save_tasks() -> None:

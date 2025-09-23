@@ -1,0 +1,32 @@
+version: '3.9'
+services:
+  backend:
+    build:
+      context: ./app
+    image: multicloud-demo-backend:local
+    environment:
+      # Persist tasks in a mounted volume path
+      - TASKS_FILE=/data/tasks.json
+    volumes:
+      - tasks_data:/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+    image: multicloud-demo-frontend:local
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  tasks_data:
+

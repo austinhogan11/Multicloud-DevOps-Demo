@@ -1,40 +1,61 @@
 # Multicloud DevOps Demo
 
-Portfolio project to showcase:
+Simple Todo app to show a full stack:
 
-- API development (FastAPI). We created a simple FastAPI application with a root, health check, and a Tasks API to demonstrate API concepts.
-- Monitoring (Splunk)
-- Analytics (Adobe Analytics)
-- Cloud deployment (AWS)
+- Backend: FastAPI Tasks API
+- Frontend: React + Vite + Tailwind
+- Persistence: JSON file (survives restarts)
+- Docker: Frontend (Nginx) + Backend (Uvicorn) with Compose
 
-## Local Setup
+## What We Built
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+- Todo UI
+  - Centered card with list, add item, edit (pen), delete (X)
+  - Dark mode and orange accents
+- API wiring
+  - Frontend calls `/api/*` (proxied to FastAPI)
+  - Optimistic updates (UI updates first; reverts on error)
+- Data persistence
+  - Tasks saved to a JSON file on the server
+  - File path can be set with `TASKS_FILE` env var
 
-2. Run the application:
-   ```bash
-   uvicorn main:app --reload
-   ```
+## Run Locally (Dev)
 
-3. Test the endpoints:
-   - `/` for root
-   - `/health` for health check
-   - `/tasks` for Tasks API
+- Backend
+  ```bash
+  cd projects/Multicloud-DevOps-Demo/app
+  pip install -r ../requirements.txt
+  uvicorn main:app --reload --port 8000
+  ```
 
-## Features
+- Frontend
+  ```bash
+  cd projects/Multicloud-DevOps-Demo/frontend
+  npm ci
+  npm run dev
+  ```
 
-- `/health`: Returns a simple status check to confirm the API is running.
-- `/tasks`: Supports GET to list all tasks, POST to create a new task, PUT to update tasks, and DELETE to remove tasks.
-- `/tasks/{id}`: Supports GET to fetch a single task by id, PUT to update a specific task, and DELETE to remove a specific task.
+Open: Frontend http://localhost:5173  |  API http://127.0.0.1:8000
 
-The Task data model includes:
-- `id` (int): Unique identifier for the task.
-- `title` (str): The title or description of the task.
-- `completed` (bool, default False): Status indicating if the task is completed.
+## Run with Docker
 
-## Status
+```bash
+cd projects/Multicloud-DevOps-Demo
+docker compose up --build
+```
 
-Work in progress. The application details will be added as development continues.
+- Frontend: http://localhost:8080
+- API: http://localhost:8000
+- Tasks persist in a Docker volume (`/data/tasks.json`)
+
+## API (FastAPI)
+
+- `GET /health` – health check
+- `GET /tasks/` – list tasks
+- `POST /tasks/` – create task (expects `{ id, title, completed }`)
+- `GET /tasks/{id}` – get one
+- `PUT /tasks/{id}` – update task
+- `DELETE /tasks/{id}` – remove task
+
+Task model: `id: int`, `title: str`, `completed: bool = False`
+
