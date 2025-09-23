@@ -52,6 +52,17 @@ docker compose up --build
 - API: http://localhost:8000
 - Tasks persist in a Docker volume (`/data/tasks.json`)
 
+## Package for AWS Lambda
+
+```bash
+cd projects/Multicloud-DevOps-Demo
+bash scripts/build_lambda.sh
+```
+
+- Upload `lambda.zip` to a Python 3.12 Lambda
+- Handler: `app.main.handler`
+- For temporary file writes, set env: `TASKS_FILE=/tmp/tasks.json`
+
 ## API (FastAPI)
 
 - `GET /health` – health check
