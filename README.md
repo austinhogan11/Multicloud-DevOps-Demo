@@ -73,3 +73,29 @@ bash scripts/build_lambda.sh
 - `DELETE /tasks/{id}` – remove task
 
 Task model: `id: int`, `title: str`, `completed: bool = False`
+
+## AWS Deployment (Simple)
+
+- Frontend (CloudFront): https://d3lfv4me48i7vz.cloudfront.net
+- API (API Gateway): https://xsryp4wqxi.execute-api.us-east-1.amazonaws.com
+
+Deploy updates
+- Backend:
+  - From repo root: `bash scripts/build_lambda.sh` → upload `lambda.zip` to Lambda (Python 3.12, handler `app.main.handler`).
+  - Set env `ALLOW_ORIGINS=https://d3lfv4me48i7vz.cloudfront.net` so CORS allows the site.
+- Frontend:
+  - In `frontend/.env.production`, set `VITE_API_BASE` to the API URL above.
+  - `npm run build` and upload `frontend/dist/` to S3, then invalidate CloudFront.
+
+## AWS Deployment (Simple)
+
+- Frontend (CloudFront): https://d3lfv4me48i7vz.cloudfront.net
+- API (API Gateway): https://xsryp4wqxi.execute-api.us-east-1.amazonaws.com
+
+Deploy updates
+- Backend:
+  - From repo root: `bash scripts/build_lambda.sh` → uploads `lambda.zip` to the Lambda (Python 3.12, handler `app.main.handler`).
+  - Set env `ALLOW_ORIGINS=https://d3lfv4me48i7vz.cloudfront.net` so CORS allows the site.
+- Frontend:
+  - In `frontend/.env.production`, set `VITE_API_BASE` to the API URL above.
+  - `npm run build` and upload `frontend/dist/` to your S3 site bucket, then invalidate CloudFront.
