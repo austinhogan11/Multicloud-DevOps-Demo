@@ -1,0 +1,53 @@
+name: Deploy Backend (Lambda)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "app/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # Required for OIDC and checkout
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      LAMBDA_FUNCTION: ${{ vars.LAMBDA_FUNCTION || 'fastapi-tasks' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      # Build a Lambda-compatible zip (Python 3.11) using the Lambda base image
+      - name: Build lambda.zip
+        run: |
+          rm -rf lambda_pkg lambda.zip
+          mkdir -p lambda_pkg
+          docker run --rm \
+            --platform linux/amd64 \
+            -v "$PWD":/var/task -w /var/task \
+            --entrypoint /bin/sh public.ecr.aws/lambda/python:3.11 -lc '
+              pip install --upgrade pip setuptools wheel &&
+              pip install --no-cache-dir -r app/requirements.txt -t lambda_pkg
+            '
+          cp -r app lambda_pkg/
+          (cd lambda_pkg && zip -r ../lambda.zip .)
+
+      - name: Update Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION" \
+            --zip-file fileb://lambda.zip

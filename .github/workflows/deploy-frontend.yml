@@ -1,0 +1,58 @@
+name: Deploy Frontend (S3 + CloudFront)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      S3_BUCKET: ${{ vars.S3_BUCKET }}                       # e.g. taskapi-todo-demo
+      CF_DISTRIBUTION_ID: ${{ vars.CF_DISTRIBUTION_ID }}     # e.g. E3RO7BKWI4B10A
+      VITE_API_URL: ${{ vars.VITE_API_URL }}                 # e.g. https://<api-id>.execute-api.us-east-1.amazonaws.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build
+        working-directory: frontend
+        run: |
+          echo "VITE_API_URL=${VITE_API_URL}" > .env
+          npm ci
+          npm run build
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync frontend/dist/ "s3://${S3_BUCKET}" --delete
+          # Ensure HTML revalidates quickly; assets are fingerprinted and can be long-lived
+          aws s3 cp frontend/dist/index.html "s3://${S3_BUCKET}/index.html" \
+            --cache-control "max-age=60,public" --content-type "text/html"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${CF_DISTRIBUTION_ID}" \
+            --paths "/*"
