@@ -1,0 +1,128 @@
+name: Deploy Full Stack (Infra + Backend + Frontend)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+      - 'frontend/**'
+      - 'infra/**'
+      - '.github/workflows/deploy-stack.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      LAMBDA_FUNCTION: ${{ vars.LAMBDA_FUNCTION || '' }}
+      # Optional fallbacks if Terraform state/outputs are not configured
+      FALLBACK_API_BASE: ${{ vars.VITE_API_BASE || vars.VITE_API_URL }}
+      FALLBACK_S3_BUCKET: ${{ vars.S3_BUCKET }}
+      FALLBACK_CF_DIST_ID: ${{ vars.CF_DISTRIBUTION_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read region from tfvars
+        id: tfvars
+        run: |
+          FILE=infra/aws/live/us-east-1/app/dev.tfvars
+          REGION=$(awk -F'=' '/^aws_region/ {gsub(/[ "\r\t]/,"",$2); print $2}' "$FILE")
+          if [ -z "$REGION" ]; then REGION=us-east-1; fi
+          echo "region=$REGION" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ steps.tfvars.outputs.region }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build lambda.zip (Python 3.12, linux/amd64)
+        run: |
+          rm -rf build && mkdir -p build/deps
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD":/var/task -w /var/task \
+            --entrypoint /bin/sh public.ecr.aws/sam/build-python3.12:latest -lc '
+              python -V && pip install --upgrade pip setuptools wheel && \
+              pip install --no-cache-dir -r app/requirements.txt -t build/deps
+            '
+          cp -r app build/deps/
+          (cd build/deps && zip -qr ../lambda.zip .)
+
+      - name: Terraform init/apply (if backend configured)
+        id: tf
+        working-directory: infra/aws/live/us-east-1/app
+        env:
+          TF_IN_AUTOMATION: 1
+        run: |
+          set -e
+          if [ -n "${{ vars.TF_STATE_BUCKET }}" ] && [ -n "${{ vars.TF_STATE_KEY }}" ]; then
+            INIT_ARGS=("-upgrade" "-backend-config=bucket=${{ vars.TF_STATE_BUCKET }}" "-backend-config=key=${{ vars.TF_STATE_KEY }}" "-backend-config=region=${{ steps.tfvars.outputs.region }}")
+            if [ -n "${{ vars.TF_LOCK_TABLE }}" ]; then INIT_ARGS+=("-backend-config=dynamodb_table=${{ vars.TF_LOCK_TABLE }}"); fi
+            terraform init "${INIT_ARGS[@]}"
+            terraform apply -auto-approve -var-file=dev.tfvars
+            terraform output -json > $GITHUB_WORKSPACE/tf_outputs.json
+            echo "tf_outputs=true" >> $GITHUB_OUTPUT
+          else
+            echo "No TF_STATE_* provided; skipping Terraform apply."
+            echo "tf_outputs=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Derive deployment values
+        id: derive
+        run: |
+          set -e
+          if [ "${{ steps.tf.outputs.tf_outputs }}" = "true" ]; then
+            API_BASE=$(jq -r .api_base_url.value tf_outputs.json)
+            BUCKET=$(jq -r .frontend_bucket.value tf_outputs.json)
+            CFID=$(jq -r .cf_distribution_id.value tf_outputs.json)
+            LAMBDA_NAME=$(jq -r .lambda_name.value tf_outputs.json)
+            LAMBDA_ARN=$(jq -r .lambda_arn.value tf_outputs.json)
+          else
+            API_BASE="${FALLBACK_API_BASE}"
+            BUCKET="${FALLBACK_S3_BUCKET}"
+            CFID="${FALLBACK_CF_DIST_ID}"
+            LAMBDA_NAME="${LAMBDA_FUNCTION}"
+            LAMBDA_ARN=""
+          fi
+          echo "api_base=$API_BASE" >> $GITHUB_OUTPUT
+          echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
+          echo "cfid=$CFID" >> $GITHUB_OUTPUT
+          echo "lambda_name=$LAMBDA_NAME" >> $GITHUB_OUTPUT
+          echo "lambda_arn=$LAMBDA_ARN" >> $GITHUB_OUTPUT
+
+      - name: Update Lambda code
+        run: |
+          TARGET_FN="${{ steps.derive.outputs.lambda_arn }}"
+          if [ -z "$TARGET_FN" ]; then TARGET_FN="${{ steps.derive.outputs.lambda_name }}"; fi
+          aws lambda update-function-code --function-name "$TARGET_FN" --zip-file fileb://build/lambda.zip > /dev/null
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          echo "VITE_API_BASE=${{ steps.derive.outputs.api_base }}" > .env
+          npm ci
+          npm run build
+
+      - name: Sync to S3
+        run: |
+          export AWS_DEFAULT_REGION=${{ steps.tfvars.outputs.region }}
+          aws s3 sync frontend/dist/ "s3://${{ steps.derive.outputs.bucket }}" --delete
+          aws s3 cp frontend/dist/index.html "s3://${{ steps.derive.outputs.bucket }}/index.html" \
+            --cache-control "max-age=60,public" --content-type "text/html"
+
+      - name: Invalidate CloudFront
+        if: ${{ steps.derive.outputs.cfid != '' }}
+        run: |
+          export AWS_DEFAULT_REGION=${{ steps.tfvars.outputs.region }}
+          aws cloudfront create-invalidation --distribution-id "${{ steps.derive.outputs.cfid }}" --paths "/*"

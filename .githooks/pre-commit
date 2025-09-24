@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Block committing files larger than ~95MB
+limit=$((95 * 1024 * 1024))
+
+large_files=()
+while IFS= read -r -d '' file; do
+  # Skip deleted files
+  if [ ! -f "$file" ]; then
+    continue
+  fi
+  size=$(wc -c <"$file")
+  if [ "$size" -gt "$limit" ]; then
+    large_files+=("$file")
+  fi
+done < <(git diff --cached --name-only -z)
+
+if [ ${#large_files[@]} -gt 0 ]; then
+  echo "Error: The following staged files exceed 95MB and are blocked:" >&2
+  for f in "${large_files[@]}"; do
+    printf '  - %s (%s bytes)\n' "$f" "$(wc -c <"$f")" >&2
+  done
+  echo "\nConsider adding patterns to .gitignore or using Git LFS if needed." >&2
+  exit 1
+fi
+
+exit 0
+

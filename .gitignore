@@ -1,0 +1,37 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+.venv/
+.env
+
+# Node/Frontend
+node_modules/
+dist/
+build/
+.next/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.*.log
+.terraform.tfstate.lock.info
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+terraform.tfvars
+*.tfvars
+
+# Lambda build artifacts
+lambda.zip
+lambda_pkg/
+
+# IDE/Editor
+.idea/
+.vscode/
+
+# Archives (avoid committing large zips)
+*.zip
