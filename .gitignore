@@ -22,8 +22,8 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+# Only ignore the default terraform.tfvars; keep env-specific files like dev.tfvars in repo
 terraform.tfvars
-*.tfvars
 
 # Lambda build artifacts
 lambda.zip
