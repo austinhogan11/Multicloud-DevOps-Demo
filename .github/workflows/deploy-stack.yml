@@ -36,6 +36,24 @@ jobs:
           if [ -z "$REGION" ]; then REGION=us-east-1; fi
           echo "region=$REGION" >> "$GITHUB_OUTPUT"
 
+      - name: Inspect OIDC token (debug)
+        if: ${{ env.DEBUG_OIDC == '1' }}
+        id: oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const t = await core.getIDToken('sts.amazonaws.com');
+            const payload = JSON.parse(Buffer.from(t.split('.')[1], 'base64').toString());
+            core.setOutput('sub', payload.sub);
+            core.setOutput('aud', payload.aud);
+            core.setOutput('ref', process.env.GITHUB_REF || '');
+            core.setOutput('repo', process.env.GITHUB_REPOSITORY || '');
+      - run: |
+          echo "OIDC sub=${{ steps.oidc.outputs.sub }}"
+          echo "OIDC aud=${{ steps.oidc.outputs.aud }}"
+          echo "ref=${{ steps.oidc.outputs.ref }}"
+          echo "repo=${{ steps.oidc.outputs.repo }}"
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
