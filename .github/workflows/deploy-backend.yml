@@ -31,7 +31,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
-      # Build a Lambda-compatible zip (Python 3.11) using the Lambda base image
+      # Build a Lambda-compatible zip (Python 3.12 x86_64) using the AWS SAM build image
       - name: Build lambda.zip
         run: |
           rm -rf lambda_pkg lambda.zip
@@ -39,8 +39,8 @@ jobs:
           docker run --rm \
             --platform linux/amd64 \
             -v "$PWD":/var/task -w /var/task \
-            --entrypoint /bin/sh public.ecr.aws/lambda/python:3.11 -lc '
-              pip install --upgrade pip setuptools wheel &&
+            --entrypoint /bin/sh public.ecr.aws/sam/build-python3.12:latest -lc '
+              python -V && pip install --upgrade pip setuptools wheel && \
               pip install --no-cache-dir -r app/requirements.txt -t lambda_pkg
             '
           cp -r app lambda_pkg/

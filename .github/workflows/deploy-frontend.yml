@@ -20,7 +20,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       S3_BUCKET: ${{ vars.S3_BUCKET }}                       # e.g. taskapi-todo-demo
       CF_DISTRIBUTION_ID: ${{ vars.CF_DISTRIBUTION_ID }}     # e.g. E3RO7BKWI4B10A
-      VITE_API_URL: ${{ vars.VITE_API_URL }}                 # e.g. https://<api-id>.execute-api.us-east-1.amazonaws.com
+      VITE_API_BASE: ${{ vars.VITE_API_BASE || vars.VITE_API_URL }}   # prefer VITE_API_BASE; fallback to old var name
 
     steps:
       - name: Checkout
@@ -40,7 +40,7 @@ jobs:
       - name: Build
         working-directory: frontend
         run: |
-          echo "VITE_API_URL=${VITE_API_URL}" > .env
+          echo "VITE_API_BASE=${VITE_API_BASE}" > .env
           npm ci
           npm run build
 
