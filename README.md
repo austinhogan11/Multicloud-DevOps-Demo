@@ -21,48 +21,18 @@ Simple Todo app to show a full stack:
 The app is a small full‑stack deployed to AWS with Terraform and GitHub Actions.
 
 ```mermaid
-flowchart LR
-  user[User Browser]
+flowchart TD
+  User --> CloudFront --> S3
+  User --> APIGateway --> Lambda --> CloudWatch
 
-  subgraph Frontend
-    cf[CloudFront]
-    s3[S3 (static site)]
-  end
+  GitHub_Actions --> Terraform --> AWS_Resources
+  Terraform --> TF_State_S3
+  Terraform --> TF_Lock_DynamoDB
 
-  subgraph Backend
-    apigw[API Gateway (HTTP)]
-    lambda[AWS Lambda (FastAPI)]
-    logs[CloudWatch Logs]
-  end
-
-  subgraph CI_CD[GitHub Actions]
-    gha[Workflows]
-    buildL[Build lambda.zip]
-    buildFE[Build React/Tailwind]
-    tf[Terraform]
-    sync[S3 sync + CF invalidate]
-  end
-
-  subgraph Terraform
-    state[(S3 TF state)]
-    lock[(DynamoDB lock)]
-    res[Infra: S3, CF, API GW, Lambda, IAM]
-  end
-
-  user --> cf --> s3
-  user -.fetch.-> apigw
-  apigw --> lambda --> logs
-
-  gha --> buildL
-  gha --> buildFE --> sync
-  gha --> tf
-  tf --> state
-  tf --> lock
-  tf --> res
-  res --> cf
-  res --> s3
-  res --> apigw
-  res --> lambda
+  AWS_Resources --> CloudFront
+  AWS_Resources --> S3
+  AWS_Resources --> APIGateway
+  AWS_Resources --> Lambda
 ```
 
 ASCII fallback
