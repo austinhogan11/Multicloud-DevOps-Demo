@@ -22,39 +22,18 @@ The app is a small full‑stack deployed to AWS with Terraform and GitHub Action
 
 ```mermaid
 flowchart TD
-  %% Simple, reliable diagram for GitHub rendering
-  User --> CloudFront --> S3
-  User --> APIGateway --> Lambda --> CloudWatch
-
-  GitHub_Actions --> Terraform --> AWS_Resources
-  Terraform --> TF_State_S3
-  Terraform --> TF_Lock_DynamoDB
-
-  AWS_Resources --> CloudFront
-  AWS_Resources --> S3
-  AWS_Resources --> APIGateway
-  AWS_Resources --> Lambda
-```
-
-### Architecture (branded)
-
-GitHub’s Mermaid doesn’t support inline images/icons in nodes, but we can use emojis and color classes for a cleaner look that still renders reliably.
-
-```mermaid
-flowchart TD
-  %% Nodes
+  %% Nodes (no emojis, branded colors)
   User[User]
+  GH[GitHub Actions]
+  TF[Terraform]
+  AWS[AWS Resources]
+  TFS3[S3 TF State]
+  TFDDB[DynamoDB Lock]
   CF[CloudFront]
   S3[S3]
   APIGW[API Gateway]
   LMB[Lambda]
   CW[CloudWatch]
-
-  GH[🐙 GitHub Actions]
-  TF[🟪 Terraform]
-  AWS[(☁️ AWS Resources)]
-  TFS3[S3 TF State]
-  TFDDB[DynamoDB Lock]
 
   %% Edges
   User --> CF --> S3
@@ -67,6 +46,9 @@ flowchart TD
   AWS --> S3
   AWS --> APIGW
   AWS --> LMB
+  AWS --> CW
+  AWS --> TFS3
+  AWS --> TFDDB
 
   %% Classes / colors
   classDef gh fill:#24292e,stroke:#0d1117,color:#ffffff
@@ -85,29 +67,28 @@ flowchart TD
   class User user
 ```
 
-If you’d like official logos inside nodes, we can export a static SVG/PNG and include it under `docs/` for the README to display.
+## Delivery Timeline (Sprints)
 
-ASCII fallback
-
-```
-User → CloudFront → S3 (static SPA)
-SPA → fetch → API Gateway (HTTP) → Lambda (FastAPI)
-Lambda logs → CloudWatch
-GitHub Actions → (OIDC assume role) → Terraform (S3 state + DDB lock) → AWS
-CI builds lambda.zip + frontend, applies TF, syncs S3, invalidates CF.
-```
-
-## What We Built
-
-- Todo UI
-  - Centered card with list, add item, edit (pen), delete (X)
-  - Dark mode and orange accents
-- API wiring
-  - Frontend calls `/api/*` (proxied to FastAPI)
-  - Optimistic updates (UI updates first; reverts on error)
-- Data persistence
-  - Tasks saved to a JSON file on the server
-  - File path can be set with `TASKS_FILE` env var
+- Sprint 1: Backend + API
+  - FastAPI Tasks API with health and CRUD endpoints
+  - JSON persistence (local file) and Mangum handler for Lambda
+- Sprint 2: Frontend
+  - React + Vite + Tailwind SPA (dark theme, optimistic UI updates)
+  - Clean components and minimal state, API client stub
+- Sprint 3: Wire API between front and back
+  - VITE_API_BASE and dev proxy; error handling and retries
+  - CORS configured in FastAPI; validated with browser and curl
+- Sprint 4: Infrastructure as Code (Terraform on AWS)
+  - S3 (static site), CloudFront (OAC), API Gateway (HTTP API), Lambda, IAM
+  - Remote state (S3) + optional DynamoDB lock; outputs for API/CDN/ bucket
+- Sprint 5: CI/CD (GitHub Actions)
+  - OIDC AssumeRole; build lambda.zip via SAM image; terraform init/apply
+  - Build frontend with VITE_API_BASE from TF output; S3 sync; CF invalidate
+  - Sanity steps: backend resources, API health probe, bundle URL check, CORS preflight
+- Sprint 6: Analytics
+  - Plausible integration pattern documented; ready to plug in custom domains
+- Sprint 7: Monitoring
+  - CloudWatch logs; hook points for Splunk/third‑party ingestion
 
 ## Run Locally (Dev)
 
