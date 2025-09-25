@@ -24,13 +24,11 @@ The app is a small full‑stack deployed to AWS with Terraform and GitHub Action
 flowchart LR
 
   %% CI/CD orchestrator
-  GH[GitHub Actions] --> TF
+  CI[GitHub Actions] --> TF
 
   %% Left-to-right: Frontend | API | Backend
   subgraph FE[Frontend]
-    R[React.js] --> UI[Todo UI]
-    V[Vite] --> UI
-    T[TailwindCSS] --> UI
+    Stack[React + Vite + Tailwind] --> UI[Todo UI]
   end
 
   subgraph API[API]
@@ -38,12 +36,12 @@ flowchart LR
   end
 
   subgraph BE[Backend]
-    Py[Python] --> FAPI[FastAPI]
+    BEStack[Python + FastAPI]
   end
 
   %% Bidirectional wiring
   UI <--> Task
-  FAPI <--> Task
+  BEStack <--> Task
 
   %% Terraform beneath the three sections
   subgraph TF[Terraform]
@@ -62,13 +60,13 @@ flowchart LR
     subgraph AWS_FE[Frontend]
       direction TB
       CF[CloudFront] --> S3[S3]
-      CF --> CFURL[Frontend URL: d340jwtq80qp5u.cloudfront.net]
+      CF --> CFURL[URL: d340jwtq80qp5u.cloudfront.net]
     end
 
     %% API in AWS
     subgraph AWS_API[API]
       direction TB
-      APIGW[API Gateway] --> APIURL[API URL: m49frfvff3.execute-api.us-east-1.amazonaws.com]
+      APIGW[API Gateway] --> APIURL[URL: m49frfvff3.execute-api.us-east-1.amazonaws.com]
     end
 
     %% Backend in AWS
@@ -78,8 +76,7 @@ flowchart LR
     end
 
     %% Terraform backend (part of AWS)
-    TFS3[S3 TF State]
-    TFDDB[DynamoDB Lock]
+    TFSTATE[TF State: S3 + DynamoDB]
   end
 ```
 
@@ -157,44 +154,4 @@ bash scripts/build_lambda.sh
 
 Task model: `id: int`, `title: str`, `completed: bool = False`
 
-## Deployments
-
-We use GitHub Actions + Terraform to deploy infra and app end‑to‑end.
-
-- Workflow: `.github/workflows/deploy-stack.yml`
-  - Builds `build/lambda.zip` in a Linux (x86_64) container for Lambda
-  - Terraform init/apply with S3 state and optional DynamoDB lock
-  - Reads TF outputs and sets `VITE_API_BASE` for the frontend build
-  - Syncs frontend to S3 and invalidates CloudFront
-  - Verifies CORS and API health in CI logs
-
-- Secrets/variables needed
-  - Secret `AWS_ROLE_ARN`: OIDC‑assumable role ARN
-  - Vars `TF_STATE_BUCKET`, `TF_STATE_KEY`, optional `TF_LOCK_TABLE`
-  - Optional fallbacks: `LAMBDA_FUNCTION`, `S3_BUCKET`, `CF_DISTRIBUTION_ID` (used if TF is skipped)
-
-- CORS and config
-  - Lambda env `ALLOW_ORIGINS` is auto‑set by Terraform to the CloudFront domain
-  - `frontend` build sets `VITE_API_BASE` from TF output (API Gateway invoke URL)
-
-Note: Terraform ignores Lambda `filename`/`source_code_hash` so CI can update code without perpetual diffs.
-
-## Delivery Timeline (Sprints)
-
-- Sprint 1: Backend + API
-  - FastAPI “Tasks” service with health, CRUD, JSON persistence
-  - Packaged for AWS Lambda using Mangum handler
-- Sprint 2: Frontend
-  - React + Vite + Tailwind SPA with dark theme and optimistic UI
-- Sprint 3: Wire API between front and back
-  - API client, error handling, env‑driven API base
-- Sprint 4: Infrastructure as Code (Terraform)
-  - S3 (static site), CloudFront (OAC), API Gateway (HTTP API), Lambda, IAM
-  - Remote state backend: S3 + optional DynamoDB lock
-- Sprint 5: CI/CD (GitHub Actions)
-  - OIDC AssumeRole; build lambda.zip; Terraform apply; build frontend; S3 sync; CF invalidate
-  - Sanity checks and verification steps (API health, CORS, bundle URL check)
-- Sprint 6: Analytics
-  - Plausible analytics wired (example integration pattern)
-- Sprint 7: Monitoring
-  - Placeholder for Splunk (ship logs/metrics from Lambda, infra states)
+## 
