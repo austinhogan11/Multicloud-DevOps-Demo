@@ -11,6 +11,11 @@ Simple Todo app to show a full stack:
 
 <img src="docs/todo-app.png" alt="Todo App UI" />
 
+## Live URLs
+
+- Frontend (CloudFront): https://d340jwtq80qp5u.cloudfront.net/
+- API (API Gateway): https://m49frfvff3.execute-api.us-east-1.amazonaws.com
+
 ## Architecture
 
 The app is a small full‑stack deployed to AWS with Terraform and GitHub Actions.
@@ -146,28 +151,44 @@ bash scripts/build_lambda.sh
 
 Task model: `id: int`, `title: str`, `completed: bool = False`
 
-## AWS Deployment (Simple)
+## Deployments
 
-- Frontend (CloudFront): https://d3lfv4me48i7vz.cloudfront.net
-- API (API Gateway): https://xsryp4wqxi.execute-api.us-east-1.amazonaws.com
+We use GitHub Actions + Terraform to deploy infra and app end‑to‑end.
 
-Deploy updates
-- Backend:
-  - From repo root: `bash scripts/build_lambda.sh` → upload `lambda.zip` to Lambda (Python 3.12, handler `app.main.handler`).
-  - Set env `ALLOW_ORIGINS=https://d3lfv4me48i7vz.cloudfront.net` so CORS allows the site.
-- Frontend:
-  - In `frontend/.env.production`, set `VITE_API_BASE` to the API URL above.
-  - `npm run build` and upload `frontend/dist/` to S3, then invalidate CloudFront.
+- Workflow: `.github/workflows/deploy-stack.yml`
+  - Builds `build/lambda.zip` in a Linux (x86_64) container for Lambda
+  - Terraform init/apply with S3 state and optional DynamoDB lock
+  - Reads TF outputs and sets `VITE_API_BASE` for the frontend build
+  - Syncs frontend to S3 and invalidates CloudFront
+  - Verifies CORS and API health in CI logs
 
-## AWS Deployment (Simple)
+- Secrets/variables needed
+  - Secret `AWS_ROLE_ARN`: OIDC‑assumable role ARN
+  - Vars `TF_STATE_BUCKET`, `TF_STATE_KEY`, optional `TF_LOCK_TABLE`
+  - Optional fallbacks: `LAMBDA_FUNCTION`, `S3_BUCKET`, `CF_DISTRIBUTION_ID` (used if TF is skipped)
 
-- Frontend (CloudFront): https://d3lfv4me48i7vz.cloudfront.net
-- API (API Gateway): https://xsryp4wqxi.execute-api.us-east-1.amazonaws.com
+- CORS and config
+  - Lambda env `ALLOW_ORIGINS` is auto‑set by Terraform to the CloudFront domain
+  - `frontend` build sets `VITE_API_BASE` from TF output (API Gateway invoke URL)
 
-Deploy updates
-- Backend:
-  - From repo root: `bash scripts/build_lambda.sh` → uploads `lambda.zip` to the Lambda (Python 3.12, handler `app.main.handler`).
-  - Set env `ALLOW_ORIGINS=https://d3lfv4me48i7vz.cloudfront.net` so CORS allows the site.
-- Frontend:
-  - In `frontend/.env.production`, set `VITE_API_BASE` to the API URL above.
-  - `npm run build` and upload `frontend/dist/` to your S3 site bucket, then invalidate CloudFront.
+Note: Terraform ignores Lambda `filename`/`source_code_hash` so CI can update code without perpetual diffs.
+
+## Delivery Timeline (Sprints)
+
+- Sprint 1: Backend + API
+  - FastAPI “Tasks” service with health, CRUD, JSON persistence
+  - Packaged for AWS Lambda using Mangum handler
+- Sprint 2: Frontend
+  - React + Vite + Tailwind SPA with dark theme and optimistic UI
+- Sprint 3: Wire API between front and back
+  - API client, error handling, env‑driven API base
+- Sprint 4: Infrastructure as Code (Terraform)
+  - S3 (static site), CloudFront (OAC), API Gateway (HTTP API), Lambda, IAM
+  - Remote state backend: S3 + optional DynamoDB lock
+- Sprint 5: CI/CD (GitHub Actions)
+  - OIDC AssumeRole; build lambda.zip; Terraform apply; build frontend; S3 sync; CF invalidate
+  - Sanity checks and verification steps (API health, CORS, bundle URL check)
+- Sprint 6: Analytics
+  - Plausible analytics wired (example integration pattern)
+- Sprint 7: Monitoring
+  - Placeholder for Splunk (ship logs/metrics from Lambda, infra states)
