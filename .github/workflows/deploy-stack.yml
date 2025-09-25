@@ -175,7 +175,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: |
-          echo "VITE_API_BASE=${{ steps.derive.outputs.api_base }}" > .env
+          echo "VITE_API_BASE=${{ steps.derive.outputs.api_base }}" | tee .env .env.production >/dev/null
           npm ci
           npm run build
 
@@ -188,11 +188,11 @@ jobs:
             exit 0
           fi
           echo "Looking for API URL in built assets: $API"
-          if grep -R --binary-files=text -n "$API" frontend/dist >/dev/null 2>&1; then
+          if grep -R -n --binary-files=text "$API" frontend/dist >/dev/null 2>&1; then
             echo "✓ Found API URL in built assets"
           else
             echo "::error::Built assets do not reference $API. Check VITE_API_BASE during build."
-            rg -n "execute-api|VITE_API_BASE" frontend/dist || true
+            grep -R -n --binary-files=text -E "execute-api|VITE_API_BASE" frontend/dist || true
             exit 1
           fi
 
