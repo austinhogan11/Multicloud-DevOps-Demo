@@ -23,74 +23,59 @@ The app is a small full‑stack deployed to AWS with Terraform and GitHub Action
 ```mermaid
 flowchart LR
 
-  %% Enclosing CI/CD box
-  subgraph GH[GitHub Actions (CI/CD)]
+  %% CI/CD orchestrator
+  GH[GitHub Actions] --> TF
 
-    %% Left-to-right: Frontend | API | Backend
-    subgraph FE[Frontend]
-      R[React.js]
-      V[Vite]
-      T[TailwindCSS]
-      UI[Todo UI]
-      R --> UI
-      V --> UI
-      T --> UI
+  %% Left-to-right: Frontend | API | Backend
+  subgraph FE[Frontend]
+    R[React.js] --> UI[Todo UI]
+    V[Vite] --> UI
+    T[TailwindCSS] --> UI
+  end
+
+  subgraph API[API]
+    Task[Task API]
+  end
+
+  subgraph BE[Backend]
+    Py[Python] --> FAPI[FastAPI]
+  end
+
+  %% Bidirectional wiring
+  UI <--> Task
+  FAPI <--> Task
+
+  %% Terraform beneath the three sections
+  subgraph TF[Terraform]
+  end
+
+  FE --> TF
+  API --> TF
+  BE --> TF
+
+  %% Provision into AWS
+  TF --> AWS
+
+  subgraph AWS[AWS]
+    %% Frontend in AWS
+    subgraph AWS_FE[Frontend]
+      CF[CloudFront] --> S3[S3]
+      CF --> CFURL[Frontend URL: d340jwtq80qp5u.cloudfront.net]
     end
 
-    subgraph API[API]
-      Task[Task API]
+    %% API in AWS
+    subgraph AWS_API[API]
+      APIGW[API Gateway] --> APIURL[API URL: m49frfvff3.execute-api.us-east-1.amazonaws.com]
     end
 
-    subgraph BE[Backend]
-      Py[Python]
-      FAPI[FastAPI]
-      Py --> FAPI
+    %% Backend in AWS
+    subgraph AWS_BE[Backend]
+      LMB[Lambda] --> CW[CloudWatch]
     end
 
-    %% Wire FE <-> API and BE <-> API
-    UI --> Task
-    Task --> UI
-    FAPI --> Task
-    Task --> FAPI
-
-    %% Terraform beneath the three sections
-    subgraph TF[Terraform]
-    end
-
-    FE --> TF
-    API --> TF
-    BE --> TF
-
-    %% Provision into AWS
-    TF --> AWS
-
-    subgraph AWS[AWS]
-      %% Grouped by concern
-      subgraph AWS_FE[Frontend]
-        CF[CloudFront]
-        S3[S3]
-        CFURL[Frontend URL: d340jwtq80qp5u.cloudfront.net]
-        CF --> S3
-        CF --> CFURL
-      end
-
-      subgraph AWS_API[API]
-        APIGW[API Gateway]
-        APIURL[API URL: m49frfvff3.execute-api.us-east-1.amazonaws.com]
-        APIGW --> APIURL
-      end
-
-      subgraph AWS_BE[Backend]
-        LMB[Lambda]
-        CW[CloudWatch]
-        LMB --> CW
-      end
-
-      %% Terraform backend (part of AWS account)
-      TFS3[S3 TF State]
-      TFDDB[DynamoDB Lock]
-    end
-
+    %% Terraform backend (part of AWS)
+    TFS3[S3 TF State]
+    TFDDB[DynamoDB Lock]
   end
 ```
 
