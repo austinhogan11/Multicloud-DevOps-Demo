@@ -1,11 +1,7 @@
 name: Deploy Backend (Lambda)
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - "app/**"
-      - ".github/workflows/deploy-backend.yml"
+  # Manual trigger only to avoid duplicate deploys alongside full-stack
   workflow_dispatch:
 
 jobs:

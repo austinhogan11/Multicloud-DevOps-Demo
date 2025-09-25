@@ -152,6 +152,20 @@ jobs:
           echo "lambda_name=$LAMBDA_NAME" >> $GITHUB_OUTPUT
           echo "lambda_arn=$LAMBDA_ARN" >> $GITHUB_OUTPUT
 
+      - name: Show derived values and probe API
+        run: |
+          echo "API_BASE=${{ steps.derive.outputs.api_base }}"
+          echo "BUCKET=${{ steps.derive.outputs.bucket }}"
+          echo "CF_DIST_ID=${{ steps.derive.outputs.cfid }}"
+          echo "LAMBDA_NAME=${{ steps.derive.outputs.lambda_name }}"
+          if command -v curl >/dev/null 2>&1 && [ -n "${{ steps.derive.outputs.api_base }}" ]; then
+            echo "Probing API health..."
+            set +e
+            curl -fsSL "${{ steps.derive.outputs.api_base }}/health" || true
+            echo ""  # newline
+            set -e
+          fi
+
       - name: Update Lambda code
         run: |
           TARGET_FN="${{ steps.derive.outputs.lambda_arn }}"
