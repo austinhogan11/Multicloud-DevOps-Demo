@@ -166,6 +166,38 @@ jobs:
             set -e
           fi
 
+      - name: Inspect Lambda config (CORS)
+        run: |
+          set -e
+          NAME="${{ steps.derive.outputs.lambda_name }}"
+          if [ -n "$NAME" ]; then
+            echo "Fetching environment for $NAME"
+            aws lambda get-function-configuration --function-name "$NAME" \
+              --query 'Environment.Variables' --output json || true
+          else
+            echo "No lambda name derived; skipping"
+          fi
+
+      - name: Verify CORS preflight
+        run: |
+          set -e
+          API="${{ steps.derive.outputs.api_base }}"
+          ORIGIN="https://${{ steps.derive.outputs.bucket }}.s3.amazonaws.com" # fallback if CF domain not available
+          # Prefer CloudFront domain when present by querying distribution domain via AWS CLI
+          if [ -n "${{ steps.derive.outputs.cfid }}" ]; then
+            CF_DOMAIN=$(aws cloudfront get-distribution --id "${{ steps.derive.outputs.cfid }}" --query 'Distribution.DomainName' --output text 2>/dev/null || true)
+            if [ -n "$CF_DOMAIN" ] && [ "$CF_DOMAIN" != "None" ]; then ORIGIN="https://$CF_DOMAIN"; fi
+          fi
+          if [ -n "$API" ]; then
+            echo "OPTIONS $API/tasks/ with Origin: $ORIGIN"
+            curl -i -X OPTIONS \
+              -H "Origin: $ORIGIN" \
+              -H "Access-Control-Request-Method: GET" \
+              "$API/tasks/" | sed -n '1,20p'
+          else
+            echo "No API base to verify CORS against."
+          fi
+
       - name: Update Lambda code
         run: |
           TARGET_FN="${{ steps.derive.outputs.lambda_arn }}"
