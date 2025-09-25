@@ -57,13 +57,46 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ steps.tfvars.outputs.region }}
+          aws-region: ${{ steps.tfvars.outputs.region || 'us-east-1' }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActionsDeployment
+
+      - name: Sanity check Terraform backend
+        run: |
+          set -e
+          if [ -n "${{ vars.TF_STATE_BUCKET }}" ] && [ -n "${{ vars.TF_STATE_KEY }}" ]; then
+            echo "Checking S3 bucket: ${{ vars.TF_STATE_BUCKET }}"
+            if aws s3api head-bucket --bucket "${{ vars.TF_STATE_BUCKET }}" 2>/dev/null; then
+              echo "✓ S3 state bucket is accessible"
+            else
+              echo "::error::S3 bucket '${{ vars.TF_STATE_BUCKET }}' not found or not accessible by the assumed role"
+              exit 1
+            fi
+
+            if [ -n "${{ vars.TF_LOCK_TABLE }}" ]; then
+              echo "Checking DynamoDB lock table: ${{ vars.TF_LOCK_TABLE }}"
+              if aws dynamodb describe-table --table-name "${{ vars.TF_LOCK_TABLE }}" >/dev/null 2>&1; then
+                echo "✓ DynamoDB lock table is accessible"
+              else
+                echo "::error::DynamoDB table '${{ vars.TF_LOCK_TABLE }}' not found or not accessible by the assumed role"
+                exit 1
+              fi
+            else
+              echo "No TF_LOCK_TABLE provided (proceeding without state locking)"
+            fi
+          else
+            echo "TF_STATE_* not set; Terraform apply will be skipped later."
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
 
       - name: Build lambda.zip (Python 3.12, linux/amd64)
         run: |

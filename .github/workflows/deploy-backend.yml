@@ -12,7 +12,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    # Required for OIDC and checkout
     permissions:
       id-token: write
       contents: read
@@ -28,8 +27,8 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       # Build a Lambda-compatible zip (Python 3.12 x86_64) using the AWS SAM build image
       - name: Build lambda.zip
