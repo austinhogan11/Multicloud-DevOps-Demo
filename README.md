@@ -11,6 +11,78 @@ Simple Todo app to show a full stack:
 
 <img src="docs/todo-app.png" alt="Todo App UI" />
 
+## Architecture
+
+The app is a small full‑stack deployed to AWS with Terraform and GitHub Actions.
+
+```mermaid
+flowchart LR
+  user([User Browser])
+
+  subgraph FE[Frontend]
+    cf[CloudFront CDN]
+    s3[S3 Static Site Bucket]
+  end
+
+  subgraph BE[Backend]
+    apigw[API Gateway (HTTP API)]
+    lambda[(AWS Lambda\nFastAPI Task API)]
+    logs[CloudWatch Logs]
+  end
+
+  subgraph CICD[CI/CD - GitHub Actions]
+    gha[Actions Workflows\n(deploy-stack.yml)]
+    oidc[OIDC AssumeRole]
+    buildL[Build lambda.zip\n(SAM build image)]
+    buildFE[Build React/Tailwind\n(Vite)]
+    tf[Terraform init/apply]
+    sync[S3 Sync + CF Invalidate]
+  end
+
+  subgraph TF[Terraform on AWS]
+    tfs3[(S3 TF State Bucket)]
+    tfdyn[(DynamoDB Lock Table)]
+    res[Infra Resources\n(S3, CloudFront, API GW, Lambda, IAM)]
+  end
+
+  %% Frontend path
+  user --> cf --> s3
+  %% Frontend calls API
+  user -. fetch tasks .-> apigw
+
+  %% Backend path
+  apigw --> lambda --> logs
+
+  %% CI/CD wiring
+  gha --> oidc -->|sts:AssumeRoleWithWebIdentity| res
+  gha --> buildL --> tf
+  gha --> buildFE --> sync
+  tf -->|backend| tfs3
+  tf -->|lock| tfdyn
+  tf --> res
+  res --> cf
+  res --> s3
+  res --> apigw
+  res --> lambda
+
+  %% Notes
+  classDef note fill:#f7f7f7,stroke:#bbb,stroke-width:1px,color:#333;
+  note1[[VITE_API_BASE set from TF output]]
+  note2[[Lambda CORS ALLOW_ORIGINS auto-set to CloudFront domain]]
+  buildFE --- note1
+  lambda --- note2
+```
+
+ASCII fallback
+
+```
+User → CloudFront → S3 (static SPA)
+SPA → fetch → API Gateway (HTTP) → Lambda (FastAPI)
+Lambda logs → CloudWatch
+GitHub Actions → (OIDC assume role) → Terraform (S3 state + DDB lock) → AWS
+CI builds lambda.zip + frontend, applies TF, syncs S3, invalidates CF.
+```
+
 ## What We Built
 
 - Todo UI
