@@ -21,50 +21,77 @@ Simple Todo app to show a full stack:
 The app is a small full‑stack deployed to AWS with Terraform and GitHub Actions.
 
 ```mermaid
-flowchart TD
-  %% Nodes (no emojis, branded colors)
-  User[User]
-  GH[GitHub Actions]
-  TF[Terraform]
-  AWS[AWS Resources]
-  TFS3[S3 TF State]
-  TFDDB[DynamoDB Lock]
-  CF[CloudFront]
-  S3[S3]
-  APIGW[API Gateway]
-  LMB[Lambda]
-  CW[CloudWatch]
+flowchart LR
 
-  %% Edges
-  User --> CF --> S3
-  User --> APIGW --> LMB --> CW
+  %% Enclosing CI/CD box
+  subgraph GH[GitHub Actions (CI/CD)]
 
-  GH --> TF --> AWS
-  TF --> TFS3
-  TF --> TFDDB
-  AWS --> CF
-  AWS --> S3
-  AWS --> APIGW
-  AWS --> LMB
-  AWS --> CW
-  AWS --> TFS3
-  AWS --> TFDDB
+    %% Left-to-right: Frontend | API | Backend
+    subgraph FE[Frontend]
+      R[React.js]
+      V[Vite]
+      T[TailwindCSS]
+      UI[Todo UI]
+      R --> UI
+      V --> UI
+      T --> UI
+    end
 
-  %% Classes / colors
-  classDef gh fill:#24292e,stroke:#0d1117,color:#ffffff
-  classDef tf fill:#623ce4,stroke:#3a1ca6,color:#ffffff
-  classDef aws fill:#232f3e,stroke:#ff9900,color:#ffffff
-  classDef svc fill:#1f6feb,stroke:#0d3a5c,color:#ffffff
-  classDef comp fill:#ec7211,stroke:#b35a0b,color:#ffffff
-  classDef user fill:#6e7781,stroke:#444d56,color:#ffffff
+    subgraph API[API]
+      Task[Task API]
+    end
 
-  class GH gh
-  class TF tf
-  class AWS aws
-  class CF,S3,APIGW svc
-  class LMB comp
-  class CW svc
-  class User user
+    subgraph BE[Backend]
+      Py[Python]
+      FAPI[FastAPI]
+      Py --> FAPI
+    end
+
+    %% Wire FE <-> API and BE <-> API
+    UI --> Task
+    Task --> UI
+    FAPI --> Task
+    Task --> FAPI
+
+    %% Terraform beneath the three sections
+    subgraph TF[Terraform]
+    end
+
+    FE --> TF
+    API --> TF
+    BE --> TF
+
+    %% Provision into AWS
+    TF --> AWS
+
+    subgraph AWS[AWS]
+      %% Grouped by concern
+      subgraph AWS_FE[Frontend]
+        CF[CloudFront]
+        S3[S3]
+        CFURL[Frontend URL: d340jwtq80qp5u.cloudfront.net]
+        CF --> S3
+        CF --> CFURL
+      end
+
+      subgraph AWS_API[API]
+        APIGW[API Gateway]
+        APIURL[API URL: m49frfvff3.execute-api.us-east-1.amazonaws.com]
+        APIGW --> APIURL
+      end
+
+      subgraph AWS_BE[Backend]
+        LMB[Lambda]
+        CW[CloudWatch]
+        LMB --> CW
+      end
+
+      %% Terraform backend (part of AWS account)
+      TFS3[S3 TF State]
+      TFDDB[DynamoDB Lock]
+    end
+
+  end
 ```
 
 ## Delivery Timeline (Sprints)
