@@ -179,6 +179,23 @@ jobs:
           npm ci
           npm run build
 
+      - name: Verify frontend uses expected API URL
+        run: |
+          set -e
+          API="${{ steps.derive.outputs.api_base }}"
+          if [ -z "$API" ]; then
+            echo "::warning::No API base derived; skipping verification"
+            exit 0
+          fi
+          echo "Looking for API URL in built assets: $API"
+          if grep -R --binary-files=text -n "$API" frontend/dist >/dev/null 2>&1; then
+            echo "✓ Found API URL in built assets"
+          else
+            echo "::error::Built assets do not reference $API. Check VITE_API_BASE during build."
+            rg -n "execute-api|VITE_API_BASE" frontend/dist || true
+            exit 1
+          fi
+
       - name: Sync to S3
         run: |
           export AWS_DEFAULT_REGION=${{ steps.tfvars.outputs.region }}
