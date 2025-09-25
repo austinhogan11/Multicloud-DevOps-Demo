@@ -14,5 +14,5 @@ lambda_function_name = "fastapi-tasks-dev-mcdd"
 lambda_runtime       = "python3.12"
 lambda_zip_path      = "../../../../../build/lambda.zip"
 
-# CORS (must include scheme)
-allow_origins        = "https://d25f37d9l9bc21.cloudfront.net"
+# CORS: leave empty to auto-allow the deployed CloudFront domain
+allow_origins        = ""

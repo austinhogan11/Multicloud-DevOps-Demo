@@ -15,7 +15,8 @@ resource "aws_lambda_function" "api" {
   environment {
     variables = {
       TASKS_FILE    = "/tmp/tasks.json"
-      ALLOW_ORIGINS = var.allow_origins   # later set to CF domain
+      # Prefer explicit value; otherwise automatically allow the CloudFront domain
+      ALLOW_ORIGINS = var.allow_origins != "" ? var.allow_origins : "https://${aws_cloudfront_distribution.cdn.domain_name}"
     }
   }
 
@@ -24,4 +25,12 @@ resource "aws_lambda_function" "api" {
   timeout     = 10
 
   tags = local.tags
+
+  # Let CI update code outside Terraform to avoid perpetual diffs
+  lifecycle {
+    ignore_changes = [
+      filename,
+      source_code_hash,
+    ]
+  }
 }

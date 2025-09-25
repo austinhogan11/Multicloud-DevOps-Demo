@@ -47,6 +47,6 @@ variable "lambda_zip_path" {
 
 variable "allow_origins" {
   type        = string
-  description = "Comma-separated list of allowed origins for CORS"
-  default     = "*"
+  description = "Comma-separated list of allowed origins for CORS. Leave empty to auto-set to the CloudFront domain."
+  default     = ""
 }
