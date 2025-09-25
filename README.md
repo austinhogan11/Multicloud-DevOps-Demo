@@ -22,6 +22,7 @@ The app is a small full‑stack deployed to AWS with Terraform and GitHub Action
 
 ```mermaid
 flowchart TD
+  %% Simple, reliable diagram for GitHub rendering
   User --> CloudFront --> S3
   User --> APIGateway --> Lambda --> CloudWatch
 
@@ -34,6 +35,57 @@ flowchart TD
   AWS_Resources --> APIGateway
   AWS_Resources --> Lambda
 ```
+
+### Architecture (branded)
+
+GitHub’s Mermaid doesn’t support inline images/icons in nodes, but we can use emojis and color classes for a cleaner look that still renders reliably.
+
+```mermaid
+flowchart TD
+  %% Nodes
+  User[User]
+  CF[CloudFront]
+  S3[S3]
+  APIGW[API Gateway]
+  LMB[Lambda]
+  CW[CloudWatch]
+
+  GH[🐙 GitHub Actions]
+  TF[🟪 Terraform]
+  AWS[(☁️ AWS Resources)]
+  TFS3[S3 TF State]
+  TFDDB[DynamoDB Lock]
+
+  %% Edges
+  User --> CF --> S3
+  User --> APIGW --> LMB --> CW
+
+  GH --> TF --> AWS
+  TF --> TFS3
+  TF --> TFDDB
+  AWS --> CF
+  AWS --> S3
+  AWS --> APIGW
+  AWS --> LMB
+
+  %% Classes / colors
+  classDef gh fill:#24292e,stroke:#0d1117,color:#ffffff
+  classDef tf fill:#623ce4,stroke:#3a1ca6,color:#ffffff
+  classDef aws fill:#232f3e,stroke:#ff9900,color:#ffffff
+  classDef svc fill:#1f6feb,stroke:#0d3a5c,color:#ffffff
+  classDef comp fill:#ec7211,stroke:#b35a0b,color:#ffffff
+  classDef user fill:#6e7781,stroke:#444d56,color:#ffffff
+
+  class GH gh
+  class TF tf
+  class AWS aws
+  class CF,S3,APIGW svc
+  class LMB comp
+  class CW svc
+  class User user
+```
+
+If you’d like official logos inside nodes, we can export a static SVG/PNG and include it under `docs/` for the README to display.
 
 ASCII fallback
 
