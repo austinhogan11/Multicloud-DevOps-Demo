@@ -26,65 +26,7 @@ Simple Todo app to show a full stack:
 
 The app is a small full‑stack deployed to AWS with Terraform and GitHub Actions.
 
-```mermaid
-flowchart LR
-
-  %% CI/CD orchestrator
-  CI[GitHub Actions] --> TF
-
-  %% Left-to-right: Frontend | API | Backend
-  subgraph FE[Frontend]
-    Stack[React + Vite + Tailwind] --> UI[Todo UI]
-  end
-
-  subgraph API[API]
-    Task[Task API]
-  end
-
-  subgraph BE[Backend]
-    BEStack[Python + FastAPI]
-  end
-
-  %% Bidirectional wiring
-  UI <--> Task
-  BEStack <--> Task
-
-  %% Terraform beneath the three sections
-  subgraph TF[Terraform]
-  end
-
-  FE --> TF
-  API --> TF
-  BE --> TF
-
-  %% Provision into AWS
-  TF --> AWS
-
-  subgraph AWS[AWS]
-    direction TB
-    %% Frontend in AWS
-    subgraph AWS_FE[Frontend]
-      direction TB
-      CF[CloudFront] --> S3[S3]
-      CF --> CFURL[URL: d340jwtq80qp5u.cloudfront.net]
-    end
-
-    %% API in AWS
-    subgraph AWS_API[API]
-      direction TB
-      APIGW[API Gateway] --> APIURL[URL: m49frfvff3.execute-api.us-east-1.amazonaws.com]
-    end
-
-    %% Backend in AWS
-    subgraph AWS_BE[Backend]
-      direction TB
-      LMB[Lambda] --> CW[CloudWatch]
-    end
-
-    %% Terraform backend (part of AWS)
-    TFSTATE[TF State: S3 + DynamoDB]
-  end
-```
+![Architecture Diagram](docs/architecture.png)
 
 ## Delivery Timeline (Sprints)
 
