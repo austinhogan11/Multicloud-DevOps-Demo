@@ -12,6 +12,7 @@ Simple Todo app to show a full stack:
 - Analytics: Plausible pageviews + custom events (task_created/completed/deleted/edited)
 - Monitoring: CloudWatch Logs; ready to forward to Splunk
 - Local dev: Docker Compose (Nginx frontend + Uvicorn backend); tasks persist to a JSON file
+- Local-first persistence: Cached tasks in browser localStorage for offline use until cache is cleared
 
 ## Preview
 
@@ -39,16 +40,18 @@ The app is a small full‑stack deployed to AWS with Terraform and GitHub Action
 - Sprint 3: Wire API between front and back
   - VITE_API_BASE and dev proxy; error handling and retries
   - CORS configured in FastAPI; validated with browser and curl
-- Sprint 4: Infrastructure as Code (Terraform on AWS)
+- Sprint 4: Local-first persistence
+  - Browser localStorage caching so tasks remain available offline until cache is cleared
+- Sprint 5: Infrastructure as Code (Terraform on AWS)
   - S3 (static site), CloudFront (OAC), API Gateway (HTTP API), Lambda, IAM
   - Remote state (S3) + optional DynamoDB lock; outputs for API/CDN/ bucket
-- Sprint 5: CI/CD (GitHub Actions)
+- Sprint 6: CI/CD (GitHub Actions)
   - OIDC AssumeRole; build lambda.zip via SAM image; terraform init/apply
   - Build frontend with VITE_API_BASE from TF output; S3 sync; CF invalidate
   - Sanity steps: backend resources, API health probe, bundle URL check, CORS preflight
-- Sprint 6: Analytics
+- Sprint 7: Analytics
   - Plausible integration pattern documented; ready to plug in custom domains
-- Sprint 7: Monitoring
+- Sprint 8: Monitoring
   - CloudWatch logs; hook points for Splunk/third‑party ingestion
 
 ## Run Locally (Dev)
