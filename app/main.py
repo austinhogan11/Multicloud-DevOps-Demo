@@ -7,7 +7,11 @@ import os
 import json
 import threading
 from typing import Any, Dict, Optional
-from logging_splunk import log_event
+try:
+    from .logging_splunk import log_event  # when executed as app.main
+except Exception:
+    # Fallback for local runs executed as a script
+    from logging_splunk import log_event  # type: ignore
 
 # Create a FastAPI app instance
 app = FastAPI()
