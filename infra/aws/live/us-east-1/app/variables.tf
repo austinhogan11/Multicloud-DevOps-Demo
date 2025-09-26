@@ -88,3 +88,16 @@ variable "splunk_enable" {
   description = "Set to '1' to enable Splunk logging, '0' to disable"
   default     = "1"
 }
+
+# Optionally source the HEC token from AWS Secrets Manager instead of a plain var
+variable "splunk_hec_secret_arn" {
+  type        = string
+  description = "Secrets Manager secret ARN that holds the Splunk HEC token"
+  default     = ""
+}
+
+variable "splunk_hec_secret_name" {
+  type        = string
+  description = "Secrets Manager secret name/ID that holds the Splunk HEC token"
+  default     = ""
+}
