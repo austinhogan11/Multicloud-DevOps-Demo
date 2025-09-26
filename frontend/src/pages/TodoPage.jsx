@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import TodoItem from '../components/TodoItem.jsx'
 import { fetchTasks, createTask, updateTask, deleteTask as apiDeleteTask } from '../lib/api.js'
+import { loadTasks, saveTasks, getAnonId } from '../lib/storage.js'
 import { track } from '../lib/analytics.js'
 
 export default function TodoPage() {
@@ -14,19 +15,13 @@ export default function TodoPage() {
   // Count tasks not completed
   const remaining = useMemo(() => todos.filter(t => !t.completed).length, [todos])
 
-  // Load tasks on mount
+  // Local-first: load tasks from localStorage on mount
   useEffect(() => {
-    let active = true
     setLoading(true)
-    fetchTasks()
-      .then((data) => {
-        if (!active) return
-        setTodos(data)
-        setError('')
-      })
-      .catch((e) => setError(e.message || 'Failed to load tasks'))
-      .finally(() => active && setLoading(false))
-    return () => { active = false }
+    const cached = loadTasks()
+    setTodos(cached)
+    setLoading(false)
+    getAnonId() // ensure we have a stable anon id for this browser
   }, [])
 
   // Add a new task
@@ -37,28 +32,28 @@ export default function TodoPage() {
     // Backend expects an id on create; use next available
     const id = Math.max(0, ...todos.map(t => t.id)) + 1
     const optimistic = { id, title, completed: false }
-    setTodos(prev => [...prev, optimistic])
+    const nextTasks = [...todos, optimistic]
+    setTodos(nextTasks)
+    saveTasks(nextTasks)
     setNewTitle('')
+    // Best-effort sync to backend; do not revert local cache on failure
     createTask(optimistic).then(() => {
       track('task_created', { title_len: title.length })
     }).catch((e) => {
       setError(e.message || 'Failed to add task')
-      // revert optimistic add
-      setTodos(prev => prev.filter(t => t.id !== id))
       track('task_create_failed')
     })
   }
 
   // Remove a task
   function deleteTodo(todo) {
-    const current = todos
-    setTodos(prev => prev.filter(t => t.id !== todo.id))
+    const nextTasks = todos.filter(t => t.id !== todo.id)
+    setTodos(nextTasks)
+    saveTasks(nextTasks)
     apiDeleteTask(todo.id).then(() => {
       track('task_deleted')
     }).catch((e) => {
       setError(e.message || 'Failed to delete task')
-      // revert optimistic delete
-      setTodos(current)
       track('task_delete_failed')
     })
   }
@@ -66,13 +61,13 @@ export default function TodoPage() {
   // Toggle completed flag
   function toggleTodo(todo) {
     const next = { ...todo, completed: !todo.completed }
-    setTodos(prev => prev.map(t => (t.id === todo.id ? next : t)))
+    const nextTasks = todos.map(t => (t.id === todo.id ? next : t))
+    setTodos(nextTasks)
+    saveTasks(nextTasks)
     updateTask(next).then(() => {
       track(next.completed ? 'task_completed' : 'task_uncompleted')
     }).catch((e) => {
       setError(e.message || 'Failed to update task')
-      // revert optimistic toggle
-      setTodos(prev => prev.map(t => (t.id === todo.id ? todo : t)))
       track('task_toggle_failed')
     })
   }
@@ -84,13 +79,13 @@ export default function TodoPage() {
     const next = title.trim()
     if (!next) return
     const updated = { ...todo, title: next }
-    setTodos(prev => prev.map(t => (t.id === todo.id ? updated : t)))
+    const nextTasks = todos.map(t => (t.id === todo.id ? updated : t))
+    setTodos(nextTasks)
+    saveTasks(nextTasks)
     updateTask(updated).then(() => {
       track('task_edited', { title_len: updated.title.length })
     }).catch((e) => {
       setError(e.message || 'Failed to update task')
-      // revert optimistic edit
-      setTodos(prev => prev.map(t => (t.id === todo.id ? todo : t)))
       track('task_edit_failed')
     })
   }
