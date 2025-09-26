@@ -2,10 +2,16 @@
 
 Simple Todo app to show a full stack:
 
-- Backend: FastAPI Tasks API
-- Frontend: React + Vite + Tailwind
-- Persistence: JSON file (survives restarts)
-- Docker: Frontend (Nginx) + Backend (Uvicorn) with Compose
+- Backend: FastAPI Tasks API (Python; Uvicorn locally, Lambda in prod)
+- Frontend: React + Vite + Tailwind single‑page app
+- API hosting: AWS Lambda behind API Gateway with CORS locked to CloudFront
+- Frontend hosting: AWS S3 + CloudFront (global CDN) with short‑cache index.html
+- Infrastructure: Terraform IaC with S3 remote state + DynamoDB lock
+- CI/CD: GitHub Actions (OIDC to AWS) builds lambda.zip, applies Terraform, builds frontend, syncs S3, invalidates CloudFront, and probes /health
+- Health: lightweight GET /health liveness endpoint used in CI and for uptime checks
+- Analytics: Plausible pageviews + custom events (task_created/completed/deleted/edited)
+- Monitoring: CloudWatch Logs; ready to forward to Splunk
+- Local dev: Docker Compose (Nginx frontend + Uvicorn backend); tasks persist to a JSON file
 
 ## Preview
 
