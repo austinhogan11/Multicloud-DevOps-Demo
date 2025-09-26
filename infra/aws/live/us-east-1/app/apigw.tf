@@ -3,10 +3,25 @@
 ############################
 
 # HTTP API (v2) — simpler/cheaper than REST API for this use case
+locals {
+  # Reuse the same origin logic as Lambda: explicit var or the CloudFront domain
+  allowed_origin = var.allow_origins != "" ? var.allow_origins : "https://${aws_cloudfront_distribution.cdn.domain_name}"
+}
+
 resource "aws_apigatewayv2_api" "http" {
   name          = "${var.project}-${var.env}-http"
   protocol_type = "HTTP"
-  tags          = local.tags
+
+  # Let API Gateway handle CORS preflight with the same origin we allow at the app level.
+  cors_configuration {
+    allow_origins     = [local.allowed_origin]
+    allow_methods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers     = ["*"]
+    allow_credentials = true
+    max_age           = 600
+  }
+
+  tags = local.tags
 }
 
 resource "aws_apigatewayv2_integration" "lambda_proxy" {
