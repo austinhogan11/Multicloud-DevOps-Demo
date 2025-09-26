@@ -6,6 +6,8 @@ from pathlib import Path
 import os
 import json
 import threading
+from typing import Any, Dict, Optional
+from logging_splunk import log_event
 
 # Create a FastAPI app instance
 app = FastAPI()
@@ -28,6 +30,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def request_logger(request, call_next):
+  response = await call_next(request)
+  try:
+    log_event("http_request", {
+      "method": request.method,
+      "path": request.url.path,
+      "status": response.status_code,
+      "user_agent": request.headers.get("user-agent"),
+    })
+  except Exception:
+    pass
+  return response
 
 # Optional AWS Lambda handler (active in Lambda or when ENABLE_MANGUM=1)
 try:
@@ -91,6 +107,10 @@ def create_task(task: Task):
         raise HTTPException(status_code=400, detail="Task with this ID already exists")
     tasks[task.id] = task
     save_tasks()
+    try:
+        log_event("task_created", {"id": task.id, "title": task.title, "completed": task.completed})
+    except Exception:
+        pass
     return task
 
 # Get all tasks
@@ -114,6 +134,10 @@ def update_task(task_id: int, updated_task: Task):
         raise HTTPException(status_code=400, detail="Task ID in body must match URL")
     tasks[task_id] = updated_task
     save_tasks()
+    try:
+        log_event("task_updated", {"id": updated_task.id, "title": updated_task.title, "completed": updated_task.completed})
+    except Exception:
+        pass
     return updated_task
 
 # Delete a task by ID
@@ -123,4 +147,8 @@ def delete_task(task_id: int):
         raise HTTPException(status_code=404, detail="Task not found")
     del tasks[task_id]
     save_tasks()
+    try:
+        log_event("task_deleted", {"id": task_id})
+    except Exception:
+        pass
     return {"detail": "Task deleted"}
