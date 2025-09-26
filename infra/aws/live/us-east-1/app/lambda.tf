@@ -17,6 +17,13 @@ resource "aws_lambda_function" "api" {
       TASKS_FILE    = "/tmp/tasks.json"
       # Prefer explicit value; otherwise automatically allow the CloudFront domain
       ALLOW_ORIGINS = var.allow_origins != "" ? var.allow_origins : "https://${aws_cloudfront_distribution.cdn.domain_name}"
+      # Splunk HEC configuration (optional)
+      SPLUNK_HEC_URL    = var.splunk_hec_url
+      SPLUNK_HEC_TOKEN  = var.splunk_hec_token
+      SPLUNK_INDEX      = var.splunk_index
+      SPLUNK_SOURCE     = var.splunk_source
+      SPLUNK_SOURCETYPE = var.splunk_sourcetype
+      SPLUNK_ENABLE     = var.splunk_enable
     }
   }
 

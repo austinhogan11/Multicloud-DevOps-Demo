@@ -50,3 +50,41 @@ variable "allow_origins" {
   description = "Comma-separated list of allowed origins for CORS. Leave empty to auto-set to the CloudFront domain."
   default     = ""
 }
+
+# --- Observability: Splunk HEC (optional) ---
+variable "splunk_hec_url" {
+  type        = string
+  description = "Splunk HTTP Event Collector base URL or /services/collector/event endpoint"
+  default     = ""
+}
+
+variable "splunk_hec_token" {
+  type        = string
+  description = "Splunk HEC token"
+  default     = ""
+  sensitive   = true
+}
+
+variable "splunk_index" {
+  type        = string
+  description = "Optional Splunk index"
+  default     = ""
+}
+
+variable "splunk_source" {
+  type        = string
+  description = "Optional Splunk source"
+  default     = "fastapi"
+}
+
+variable "splunk_sourcetype" {
+  type        = string
+  description = "Optional Splunk sourcetype"
+  default     = "_json"
+}
+
+variable "splunk_enable" {
+  type        = string
+  description = "Set to '1' to enable Splunk logging, '0' to disable"
+  default     = "1"
+}

@@ -115,13 +115,28 @@ jobs:
         working-directory: infra/aws/live/us-east-1/app
         env:
           TF_IN_AUTOMATION: 1
+          # Optional Splunk wiring from repo vars/secrets
+          SPLUNK_HEC_URL: ${{ vars.SPLUNK_HEC_URL }}
+          SPLUNK_HEC_TOKEN: ${{ secrets.SPLUNK_HEC_TOKEN }}
+          SPLUNK_INDEX: ${{ vars.SPLUNK_INDEX }}
+          SPLUNK_SOURCE: ${{ vars.SPLUNK_SOURCE }}
+          SPLUNK_SOURCETYPE: ${{ vars.SPLUNK_SOURCETYPE }}
+          SPLUNK_ENABLE: ${{ vars.SPLUNK_ENABLE || '1' }}
         run: |
           set -e
           if [ -n "${{ vars.TF_STATE_BUCKET }}" ] && [ -n "${{ vars.TF_STATE_KEY }}" ]; then
             INIT_ARGS=("-upgrade" "-backend-config=bucket=${{ vars.TF_STATE_BUCKET }}" "-backend-config=key=${{ vars.TF_STATE_KEY }}" "-backend-config=region=${{ steps.tfvars.outputs.region }}")
             if [ -n "${{ vars.TF_LOCK_TABLE }}" ]; then INIT_ARGS+=("-backend-config=dynamodb_table=${{ vars.TF_LOCK_TABLE }}"); fi
             terraform init "${INIT_ARGS[@]}"
-            terraform apply -auto-approve -var-file=dev.tfvars
+            # Conditionally pass Splunk variables if provided
+            EXTRA_VARS=()
+            [ -n "${SPLUNK_HEC_URL}" ] && EXTRA_VARS+=("-var=splunk_hec_url=${SPLUNK_HEC_URL}")
+            [ -n "${SPLUNK_HEC_TOKEN}" ] && EXTRA_VARS+=("-var=splunk_hec_token=${SPLUNK_HEC_TOKEN}")
+            [ -n "${SPLUNK_INDEX}" ] && EXTRA_VARS+=("-var=splunk_index=${SPLUNK_INDEX}")
+            [ -n "${SPLUNK_SOURCE}" ] && EXTRA_VARS+=("-var=splunk_source=${SPLUNK_SOURCE}")
+            [ -n "${SPLUNK_SOURCETYPE}" ] && EXTRA_VARS+=("-var=splunk_sourcetype=${SPLUNK_SOURCETYPE}")
+            [ -n "${SPLUNK_ENABLE}" ] && EXTRA_VARS+=("-var=splunk_enable=${SPLUNK_ENABLE}")
+            terraform apply -auto-approve -var-file=dev.tfvars "${EXTRA_VARS[@]}"
             terraform output -json > $GITHUB_WORKSPACE/tf_outputs.json
             echo "tf_outputs=true" >> $GITHUB_OUTPUT
           else
