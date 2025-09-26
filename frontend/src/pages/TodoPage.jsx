@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import TodoItem from '../components/TodoItem.jsx'
 import { fetchTasks, createTask, updateTask, deleteTask as apiDeleteTask } from '../lib/api.js'
+import { track } from '../lib/analytics.js'
 
 export default function TodoPage() {
   // Tasks from the API
@@ -38,10 +39,13 @@ export default function TodoPage() {
     const optimistic = { id, title, completed: false }
     setTodos(prev => [...prev, optimistic])
     setNewTitle('')
-    createTask(optimistic).catch((e) => {
+    createTask(optimistic).then(() => {
+      track('task_created', { title_len: title.length })
+    }).catch((e) => {
       setError(e.message || 'Failed to add task')
       // revert optimistic add
       setTodos(prev => prev.filter(t => t.id !== id))
+      track('task_create_failed')
     })
   }
 
@@ -49,10 +53,13 @@ export default function TodoPage() {
   function deleteTodo(todo) {
     const current = todos
     setTodos(prev => prev.filter(t => t.id !== todo.id))
-    apiDeleteTask(todo.id).catch((e) => {
+    apiDeleteTask(todo.id).then(() => {
+      track('task_deleted')
+    }).catch((e) => {
       setError(e.message || 'Failed to delete task')
       // revert optimistic delete
       setTodos(current)
+      track('task_delete_failed')
     })
   }
 
@@ -60,10 +67,13 @@ export default function TodoPage() {
   function toggleTodo(todo) {
     const next = { ...todo, completed: !todo.completed }
     setTodos(prev => prev.map(t => (t.id === todo.id ? next : t)))
-    updateTask(next).catch((e) => {
+    updateTask(next).then(() => {
+      track(next.completed ? 'task_completed' : 'task_uncompleted')
+    }).catch((e) => {
       setError(e.message || 'Failed to update task')
       // revert optimistic toggle
       setTodos(prev => prev.map(t => (t.id === todo.id ? todo : t)))
+      track('task_toggle_failed')
     })
   }
 
@@ -75,10 +85,13 @@ export default function TodoPage() {
     if (!next) return
     const updated = { ...todo, title: next }
     setTodos(prev => prev.map(t => (t.id === todo.id ? updated : t)))
-    updateTask(updated).catch((e) => {
+    updateTask(updated).then(() => {
+      track('task_edited', { title_len: updated.title.length })
+    }).catch((e) => {
       setError(e.message || 'Failed to update task')
       // revert optimistic edit
       setTodos(prev => prev.map(t => (t.id === todo.id ? todo : t)))
+      track('task_edit_failed')
     })
   }
 
