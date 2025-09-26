@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780" font-family="Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <style>
+      .title{font-size:20px;font-weight:600;fill:#0f172a}
+      .label{font-size:14px;fill:#0f172a}
+      .muted{font-size:12px;fill:#475569}
+      .small{font-size:12px;fill:#0f172a}
+      .box{fill:#ffffff;stroke:#cbd5e1;stroke-width:2;rx:10}
+      .aws{fill:#fff7ed;stroke:#f59e0b}
+      .ci{fill:#f1f5f9;stroke:#94a3b8}
+      .tf{fill:#eef2ff;stroke:#6366f1}
+      .accent{fill:#f97316}
+      .arrow{stroke:#64748b;stroke-width:2;marker-end:url(#arrow)}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,3 L0,6 z" fill="#64748b" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="24" y="36" class="title">Multicloud DevOps Demo – Architecture</text>
+
+  <!-- GitHub Actions (CI/CD) -->
+  <rect x="40" y="80" width="240" height="120" class="box ci"/>
+  <text x="60" y="110" class="label">GitHub Actions (OIDC → AWS)</text>
+  <text x="60" y="136" class="muted">• Build lambda.zip (SAM image)</text>
+  <text x="60" y="156" class="muted">• Build frontend (Vite)</text>
+  <text x="60" y="176" class="muted">• Sync to S3 + Invalidate CF</text>
+
+  <!-- Terraform -->
+  <rect x="40" y="230" width="240" height="90" class="box tf"/>
+  <text x="60" y="258" class="label">Terraform (IaC)</text>
+  <text x="60" y="282" class="muted">S3 TF state + DynamoDB lock</text>
+
+  <!-- Frontend box -->
+  <rect x="340" y="80" width="240" height="120" class="box"/>
+  <text x="360" y="110" class="label">Frontend</text>
+  <text x="360" y="136" class="muted">React + Vite + Tailwind</text>
+  <text x="360" y="156" class="muted">Local-first tasks (localStorage)</text>
+
+  <!-- API box -->
+  <rect x="340" y="230" width="240" height="90" class="box"/>
+  <text x="360" y="260" class="label">API</text>
+  <text x="360" y="284" class="muted">FastAPI Task API</text>
+
+  <!-- Backend box -->
+  <rect x="340" y="340" width="240" height="90" class="box"/>
+  <text x="360" y="370" class="label">Backend</text>
+  <text x="360" y="394" class="muted">Python + FastAPI (Lambda)</text>
+
+  <!-- AWS area -->
+  <rect x="640" y="60" width="520" height="600" class="box aws"/>
+  <text x="660" y="90" class="label">AWS</text>
+
+  <!-- AWS Frontend -->
+  <rect x="660" y="110" width="220" height="120" class="box"/>
+  <text x="680" y="140" class="label">Frontend</text>
+  <text x="680" y="166" class="muted">S3 (static website)</text>
+  <text x="680" y="186" class="muted">CloudFront CDN</text>
+  <text x="680" y="206" class="small">URL: d340jwtq80qp5u.cloudfront.net</text>
+
+  <!-- AWS API -->
+  <rect x="660" y="250" width="220" height="110" class="box"/>
+  <text x="680" y="278" class="label">API</text>
+  <text x="680" y="302" class="muted">API Gateway (HTTP API)</text>
+  <text x="680" y="322" class="small">URL: m49frfvff3.execute-api.us-east-1.amazonaws.com</text>
+
+  <!-- AWS Backend -->
+  <rect x="660" y="380" width="220" height="120" class="box"/>
+  <text x="680" y="410" class="label">Backend</text>
+  <text x="680" y="436" class="muted">Lambda (Python 3.12)</text>
+  <text x="680" y="456" class="muted">CloudWatch Logs</text>
+
+  <!-- AWS Observability / Secrets -->
+  <rect x="900" y="110" width="240" height="120" class="box"/>
+  <text x="920" y="140" class="label">Observability</text>
+  <text x="920" y="166" class="muted">Plausible (frontend script)</text>
+  <text x="920" y="186" class="muted">Splunk HEC (runtime logging)</text>
+
+  <rect x="900" y="250" width="240" height="110" class="box"/>
+  <text x="920" y="278" class="label">Secrets</text>
+  <text x="920" y="302" class="muted">Secrets Manager → HEC token</text>
+  <text x="920" y="322" class="muted">Lambda reads at runtime</text>
+
+  <rect x="900" y="380" width="240" height="120" class="box"/>
+  <text x="920" y="410" class="label">Terraform Backend</text>
+  <text x="920" y="436" class="muted">S3 state + DynamoDB lock</text>
+
+  <!-- User -->
+  <rect x="1080" y="520" width="60" height="120" class="box"/>
+  <text x="1096" y="590" class="label">User</text>
+
+  <!-- Arrows -->
+  <!-- CI paths -->
+  <path d="M280,140 C300,140 320,140 340,140" class="arrow"/>
+  <path d="M160,200 L160,230" class="arrow"/>
+  <path d="M280,260 C300,260 320,260 340,260" class="arrow"/>
+  <path d="M280,380 C300,380 320,380 340,380" class="arrow"/>
+
+  <!-- Terraform → AWS -->
+  <path d="M280,270 C380,270 620,270 640,270" class="arrow"/>
+
+  <!-- Frontend/API/Backend → AWS components (conceptual) -->
+  <path d="M580,140 C620,140 640,150 660,170" class="arrow"/>
+  <path d="M580,260 C620,260 640,270 660,300" class="arrow"/>
+  <path d="M580,380 C620,380 640,400 660,420" class="arrow"/>
+
+  <!-- User flows -->
+  <path d="M1120,520 C1110,420 1020,220 880,170" class="arrow"/>
+  <path d="M1120,520 C1100,360 980,330 880,320" class="arrow"/>
+
+  <!-- Notes -->
+  <text x="40" y="360" class="muted">CORS: API Gateway + FastAPI allow https://d340jwtq80qp5u.cloudfront.net</text>
+  <text x="40" y="384" class="muted">Local-first UX: tasks saved to localStorage; backend sync is best-effort</text>
+</svg>
+

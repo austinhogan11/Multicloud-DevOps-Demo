@@ -118,6 +118,8 @@ jobs:
           # Optional Splunk wiring from repo vars/secrets
           SPLUNK_HEC_URL: ${{ vars.SPLUNK_HEC_URL }}
           SPLUNK_HEC_TOKEN: ${{ secrets.SPLUNK_HEC_TOKEN }}
+          SPLUNK_HEC_SECRET_ARN: ${{ vars.SPLUNK_HEC_SECRET_ARN }}
+          SPLUNK_HEC_SECRET_NAME: ${{ vars.SPLUNK_HEC_SECRET_NAME }}
           SPLUNK_INDEX: ${{ vars.SPLUNK_INDEX }}
           SPLUNK_SOURCE: ${{ vars.SPLUNK_SOURCE }}
           SPLUNK_SOURCETYPE: ${{ vars.SPLUNK_SOURCETYPE }}
@@ -132,6 +134,8 @@ jobs:
             EXTRA_VARS=()
             [ -n "${SPLUNK_HEC_URL}" ] && EXTRA_VARS+=("-var=splunk_hec_url=${SPLUNK_HEC_URL}")
             [ -n "${SPLUNK_HEC_TOKEN}" ] && EXTRA_VARS+=("-var=splunk_hec_token=${SPLUNK_HEC_TOKEN}")
+            [ -n "${SPLUNK_HEC_SECRET_ARN}" ] && EXTRA_VARS+=("-var=splunk_hec_secret_arn=${SPLUNK_HEC_SECRET_ARN}")
+            [ -n "${SPLUNK_HEC_SECRET_NAME}" ] && EXTRA_VARS+=("-var=splunk_hec_secret_name=${SPLUNK_HEC_SECRET_NAME}")
             [ -n "${SPLUNK_INDEX}" ] && EXTRA_VARS+=("-var=splunk_index=${SPLUNK_INDEX}")
             [ -n "${SPLUNK_SOURCE}" ] && EXTRA_VARS+=("-var=splunk_source=${SPLUNK_SOURCE}")
             [ -n "${SPLUNK_SOURCETYPE}" ] && EXTRA_VARS+=("-var=splunk_sourcetype=${SPLUNK_SOURCETYPE}")
