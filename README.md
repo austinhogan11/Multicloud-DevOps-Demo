@@ -27,7 +27,7 @@ Simple Todo app to show a full stack:
 
 The app is a small full‑stack deployed to AWS with Terraform and GitHub Actions.
 
-![Architecture Diagram](docs/architecture.png)
+![Architecture Diagram](docs/todo-app.drawio.png)
 
 ## Delivery Timeline (Sprints)
 
