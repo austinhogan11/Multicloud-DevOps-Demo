@@ -4,8 +4,20 @@ from pydantic import BaseModel
 import os
 import time
 import sys
-from fastapi_limiter import FastAPILimiter
-import redis.asyncio as aioredis
+# Optional rate limiting (fastapi-limiter + Redis). Falls back to no-op if
+# the package or REDIS_URL are not configured so Lambda still runs.
+try:
+    from fastapi_limiter import FastAPILimiter  # type: ignore
+    from fastapi_limiter.depends import RateLimiter as _RateLimiter  # type: ignore
+    import redis.asyncio as aioredis  # type: ignore
+    _limiter_available = True
+except Exception:
+    _limiter_available = False
+    def _RateLimiter(*_args, **_kwargs):  # no-op dependency
+        async def _noop():
+            return None
+        return _noop
+RateLimiter = _RateLimiter
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import String, Boolean, select, delete as sql_delete
@@ -103,9 +115,13 @@ class Task(BaseModel):
 
 @app.on_event("startup")
 async def _load_on_startup():
-    if os.getenv("REDIS_URL"):
-        redis = await aioredis.from_url(os.getenv("REDIS_URL"))
-        await FastAPILimiter.init(redis)
+    if _limiter_available and os.getenv("REDIS_URL"):
+        try:
+            redis = await aioredis.from_url(os.getenv("REDIS_URL"))
+            await FastAPILimiter.init(redis)
+        except Exception as e:
+            if os.getenv("DEBUG"):
+                print(f"Rate limiter init failed: {e}", file=sys.stderr)
     # Ensure tables exist (safe for demos)
     if engine is not None:
         async with engine.begin() as conn:
