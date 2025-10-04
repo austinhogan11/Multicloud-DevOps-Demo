@@ -4,6 +4,9 @@ from pydantic import BaseModel
 import os
 import time
 import sys
+import json
+from pathlib import Path
+import threading
 # Optional rate limiting (fastapi-limiter + Redis). Falls back to no-op if
 # the package or REDIS_URL are not configured so Lambda still runs.
 try:
@@ -113,6 +116,26 @@ class Task(BaseModel):
     title: str
     completed: bool = False
 
+# --- File-based fallback storage (no DB) -----------------------------------
+TASKS_FILE = Path(os.getenv("TASKS_FILE", "/tmp/tasks.json"))
+_lock = threading.Lock()
+
+def _file_load_tasks() -> list[Task]:
+    if not TASKS_FILE.exists():
+        return []
+    try:
+        raw = json.loads(TASKS_FILE.read_text("utf-8"))
+        return [Task(**item) for item in raw] if isinstance(raw, list) else []
+    except Exception:
+        return []
+
+def _file_save_tasks(tasks: list[Task]) -> None:
+    data = [t.model_dump() for t in tasks]
+    tmp = TASKS_FILE.with_suffix(".tmp")
+    with _lock:
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(TASKS_FILE)
+
 @app.on_event("startup")
 async def _load_on_startup():
     if _limiter_available and os.getenv("REDIS_URL"):
@@ -135,14 +158,23 @@ async def get_db():
 
 # Create a task
 @app.post("/tasks/", response_model=Task, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-async def create_task(task: Task, db: AsyncSession = Depends(get_db)):
-    # Ensure unique id if client provides one
-    result = await db.execute(select(TaskORM).where(TaskORM.id == task.id))
-    if result.scalar_one_or_none() is not None:
-        raise HTTPException(status_code=400, detail="Task with this ID already exists")
-    db_obj = TaskORM(id=task.id, title=task.title, completed=task.completed)
-    db.add(db_obj)
-    await db.commit()
+async def create_task(task: Task, db: AsyncSession = Depends(get_db) if SessionLocal else None):
+    if SessionLocal is None:
+        # File-backed mode
+        items = _file_load_tasks()
+        if any(t.id == task.id for t in items):
+            raise HTTPException(status_code=400, detail="Task with this ID already exists")
+        items.append(task)
+        _file_save_tasks(items)
+    else:
+        # DB-backed mode
+        # Ensure unique id if client provides one
+        result = await db.execute(select(TaskORM).where(TaskORM.id == task.id))
+        if result.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=400, detail="Task with this ID already exists")
+        db_obj = TaskORM(id=task.id, title=task.title, completed=task.completed)
+        db.add(db_obj)
+        await db.commit()
     try:
         log_event("task_created", {"id": task.id, "title": task.title, "completed": task.completed})
     except Exception as e:
@@ -152,14 +184,22 @@ async def create_task(task: Task, db: AsyncSession = Depends(get_db)):
 
 # Get all tasks
 @app.get("/tasks/", response_model=list[Task])
-async def get_tasks(db: AsyncSession = Depends(get_db)):
+async def get_tasks(db: AsyncSession = Depends(get_db) if SessionLocal else None):
+    if SessionLocal is None:
+        return _file_load_tasks()
     result = await db.execute(select(TaskORM).order_by(TaskORM.id))
     rows = result.scalars().all()
     return [Task(id=r.id, title=r.title, completed=r.completed) for r in rows]
 
 # Get a single task by ID
 @app.get("/tasks/{task_id}", response_model=Task)
-async def get_task(task_id: int, db: AsyncSession = Depends(get_db)):
+async def get_task(task_id: int, db: AsyncSession = Depends(get_db) if SessionLocal else None):
+    if SessionLocal is None:
+        items = _file_load_tasks()
+        for t in items:
+            if t.id == task_id:
+                return t
+        raise HTTPException(status_code=404, detail="Task not found")
     result = await db.execute(select(TaskORM).where(TaskORM.id == task_id))
     row = result.scalar_one_or_none()
     if row is None:
@@ -168,16 +208,28 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_db)):
 
 # Update a task by ID
 @app.put("/tasks/{task_id}", response_model=Task, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-async def update_task(task_id: int, updated_task: Task, db: AsyncSession = Depends(get_db)):
+async def update_task(task_id: int, updated_task: Task, db: AsyncSession = Depends(get_db) if SessionLocal else None):
     if updated_task.id != task_id:
         raise HTTPException(status_code=400, detail="Task ID in body must match URL")
-    result = await db.execute(select(TaskORM).where(TaskORM.id == task_id))
-    row = result.scalar_one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    row.title = updated_task.title
-    row.completed = updated_task.completed
-    await db.commit()
+    if SessionLocal is None:
+        items = _file_load_tasks()
+        found = False
+        for i, t in enumerate(items):
+            if t.id == task_id:
+                items[i] = updated_task
+                found = True
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Task not found")
+        _file_save_tasks(items)
+    else:
+        result = await db.execute(select(TaskORM).where(TaskORM.id == task_id))
+        row = result.scalar_one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        row.title = updated_task.title
+        row.completed = updated_task.completed
+        await db.commit()
     try:
         log_event("task_updated", {"id": updated_task.id, "title": updated_task.title, "completed": updated_task.completed})
     except Exception as e:
@@ -187,13 +239,20 @@ async def update_task(task_id: int, updated_task: Task, db: AsyncSession = Depen
 
 # Delete a task by ID
 @app.delete("/tasks/{task_id}", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TaskORM).where(TaskORM.id == task_id))
-    row = result.scalar_one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    await db.execute(sql_delete(TaskORM).where(TaskORM.id == task_id))
-    await db.commit()
+async def delete_task(task_id: int, db: AsyncSession = Depends(get_db) if SessionLocal else None):
+    if SessionLocal is None:
+        items = _file_load_tasks()
+        new_items = [t for t in items if t.id != task_id]
+        if len(new_items) == len(items):
+            raise HTTPException(status_code=404, detail="Task not found")
+        _file_save_tasks(new_items)
+    else:
+        result = await db.execute(select(TaskORM).where(TaskORM.id == task_id))
+        row = result.scalar_one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        await db.execute(sql_delete(TaskORM).where(TaskORM.id == task_id))
+        await db.commit()
     try:
         log_event("task_deleted", {"id": task_id})
     except Exception as e:
