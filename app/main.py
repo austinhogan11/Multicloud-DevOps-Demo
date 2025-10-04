@@ -1,21 +1,40 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from pathlib import Path
 import os
-import json
-import threading
-from typing import Any, Dict, Optional
 import time
 import sys
 from fastapi_limiter import FastAPILimiter
 import redis.asyncio as aioredis
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, Boolean, select, delete as sql_delete
+from fastapi_limiter.depends import RateLimiter
 try:
     from .logging_splunk import log_event  # when executed as app.main
 except Exception:
     # Fallback for local runs executed as a script
     from logging_splunk import log_event  # type: ignore
+
+# --- Database (Supabase Postgres) ---
+DATABASE_URL = os.getenv("DATABASE_URL")  # e.g., postgresql://... from Supabase
+engine = None
+SessionLocal = None
+
+if DATABASE_URL:
+    # Use async driver
+    ASYNC_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+    engine = create_async_engine(ASYNC_URL, pool_pre_ping=True)
+    SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+class Base(DeclarativeBase):
+    pass
+
+class TaskORM(Base):
+    __tablename__ = "todos"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 # Create a FastAPI app instance
 app = FastAPI()
@@ -82,66 +101,32 @@ class Task(BaseModel):
     title: str
     completed: bool = False
 
- # In-memory storage for tasks (annotated for clarity)
-from typing import Dict as _Dict
-from fastapi import Depends
-from fastapi_limiter.depends import RateLimiter
-
-tasks: _Dict[int, Task] = {}
-
- # Simple local persistence to a JSON file
-# By default, write next to this module. In AWS Lambda, default to /tmp.
-_default_tasks_path = str(Path(__file__).with_name("tasks.json"))
-if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
-    _default_tasks_path = "/tmp/tasks.json"
-TASKS_FILE = Path(os.getenv("TASKS_FILE", _default_tasks_path))
-_lock = threading.Lock()
-
-# Helpers to mutate the in-memory store safely
-
-def _put_task(t: Task) -> None:
-    with _lock:
-        tasks[t.id] = t
-
-def _del_task(task_id: int) -> None:
-    with _lock:
-        if task_id in tasks:
-            del tasks[task_id]
-
-def save_tasks() -> None:
-    data = jsonable_encoder(list(tasks.values()))
-    tmp = TASKS_FILE.with_suffix(".tmp")
-    with _lock:
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        tmp.replace(TASKS_FILE)
-
-def load_tasks() -> None:
-    if not TASKS_FILE.exists():
-        return
-    try:
-        raw = json.loads(TASKS_FILE.read_text(encoding="utf-8"))
-        tasks.clear()
-        for item in raw:
-            t = Task(**item)
-            tasks[t.id] = t
-    except Exception:
-        tasks.clear()
-
 @app.on_event("startup")
 async def _load_on_startup():
     if os.getenv("REDIS_URL"):
         redis = await aioredis.from_url(os.getenv("REDIS_URL"))
         await FastAPILimiter.init(redis)
-    load_tasks()
+    # Ensure tables exist (safe for demos)
+    if engine is not None:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+async def get_db():
+    if SessionLocal is None:
+        raise HTTPException(status_code=500, detail="DATABASE_URL not configured")
+    async with SessionLocal() as session:
+        yield session
 
 # Create a task
 @app.post("/tasks/", response_model=Task, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-def create_task(task: Task):
-    if task.id in tasks:
+async def create_task(task: Task, db: AsyncSession = Depends(get_db)):
+    # Ensure unique id if client provides one
+    result = await db.execute(select(TaskORM).where(TaskORM.id == task.id))
+    if result.scalar_one_or_none() is not None:
         raise HTTPException(status_code=400, detail="Task with this ID already exists")
-    _put_task(task)
-    save_tasks()
+    db_obj = TaskORM(id=task.id, title=task.title, completed=task.completed)
+    db.add(db_obj)
+    await db.commit()
     try:
         log_event("task_created", {"id": task.id, "title": task.title, "completed": task.completed})
     except Exception as e:
@@ -151,25 +136,32 @@ def create_task(task: Task):
 
 # Get all tasks
 @app.get("/tasks/", response_model=list[Task])
-def get_tasks():
-    return list(tasks.values())
+async def get_tasks(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TaskORM).order_by(TaskORM.id))
+    rows = result.scalars().all()
+    return [Task(id=r.id, title=r.title, completed=r.completed) for r in rows]
 
 # Get a single task by ID
 @app.get("/tasks/{task_id}", response_model=Task)
-def get_task(task_id: int):
-    if task_id not in tasks:
+async def get_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TaskORM).where(TaskORM.id == task_id))
+    row = result.scalar_one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    return tasks[task_id]
+    return Task(id=row.id, title=row.title, completed=row.completed)
 
 # Update a task by ID
 @app.put("/tasks/{task_id}", response_model=Task, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-def update_task(task_id: int, updated_task: Task):
-    if task_id not in tasks:
-        raise HTTPException(status_code=404, detail="Task not found")
+async def update_task(task_id: int, updated_task: Task, db: AsyncSession = Depends(get_db)):
     if updated_task.id != task_id:
         raise HTTPException(status_code=400, detail="Task ID in body must match URL")
-    _put_task(updated_task)
-    save_tasks()
+    result = await db.execute(select(TaskORM).where(TaskORM.id == task_id))
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    row.title = updated_task.title
+    row.completed = updated_task.completed
+    await db.commit()
     try:
         log_event("task_updated", {"id": updated_task.id, "title": updated_task.title, "completed": updated_task.completed})
     except Exception as e:
@@ -179,11 +171,13 @@ def update_task(task_id: int, updated_task: Task):
 
 # Delete a task by ID
 @app.delete("/tasks/{task_id}", dependencies=[Depends(RateLimiter(times=5, seconds=60))])
-def delete_task(task_id: int):
-    if task_id not in tasks:
+async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TaskORM).where(TaskORM.id == task_id))
+    row = result.scalar_one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    _del_task(task_id)
-    save_tasks()
+    await db.execute(sql_delete(TaskORM).where(TaskORM.id == task_id))
+    await db.commit()
     try:
         log_event("task_deleted", {"id": task_id})
     except Exception as e:
